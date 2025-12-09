@@ -176,58 +176,83 @@ detect_pytorch_version() {
 # Setup Python virtual environment
 setup_venv() {
     log_section "Setting up Python environment"
-    
+
+    local version_file="$COMFY_VENV/.comfyui_version"
+    local needs_requirements_update=false
+
     if [ ! -d "$COMFY_VENV" ]; then
         log_info "Creating virtual environment for ComfyUI at $COMFY_VENV"
         "$PYTHON_ENV" -m venv "$COMFY_VENV"
-        
-        # Install dependencies
-        log_info "Installing Python dependencies"
+        needs_requirements_update=true
+    else
+        log_info "Using existing Python environment"
+        # Check if ComfyUI version changed - if so, we need to update requirements
+        if [ -f "$version_file" ]; then
+            local installed_version=$(cat "$version_file")
+            if [ "$installed_version" != "$COMFY_VERSION" ]; then
+                log_info "ComfyUI version changed ($installed_version -> $COMFY_VERSION)"
+                needs_requirements_update=true
+            fi
+        else
+            # No version file means old installation, needs update
+            log_info "Upgrading venv for new ComfyUI version"
+            needs_requirements_update=true
+        fi
+    fi
+
+    if [ "$needs_requirements_update" = true ]; then
+        log_info "Installing/updating Python dependencies for ComfyUI $COMFY_VERSION"
         "$COMFY_VENV/bin/pip" install --upgrade pip
-        "$COMFY_VENV/bin/pip" install $BASE_PACKAGES
-        # Skip requirements.txt if it contains errors, install packages directly
-        "$COMFY_VENV/bin/pip" install -r "$CODE_DIR/requirements.txt" 2>/dev/null || {
-            log_warn "Failed to install from requirements.txt, installing packages directly"
-            "$COMFY_VENV/bin/pip" install torch torchvision torchaudio torchsde einops transformers>=4.28.1 tokenizers>=0.13.3 sentencepiece aiohttp aiofiles
-            "$COMFY_VENV/bin/pip" install pyyaml Pillow scipy tqdm psutil kornia scikit-image samarium lark numba
+
+        # Install from requirements.txt (primary method)
+        log_info "Installing from requirements.txt..."
+        "$COMFY_VENV/bin/pip" install -r "$CODE_DIR/requirements.txt" || {
+            log_warn "Some requirements.txt packages failed, continuing..."
         }
-        
+
+        # Install base packages
+        "$COMFY_VENV/bin/pip" install $BASE_PACKAGES
+
         # Detect and install appropriate PyTorch version
         local TORCH_INSTALL=$(detect_pytorch_version)
         log_info "Installing PyTorch: $TORCH_INSTALL"
         "$COMFY_VENV/bin/pip" install $TORCH_INSTALL
-        
+
+        # Install additional packages (includes pydantic, alembic for v0.3.76+)
         "$COMFY_VENV/bin/pip" install $ADDITIONAL_PACKAGES
-        
-        log_info "Python environment setup complete"
-    else
-        log_info "Using existing Python environment"
-        # Check if we need to upgrade PyTorch for GPU support
-        local cuda_check_file="$COMFY_VENV/.cuda_checked"
-        if [ ! -f "$cuda_check_file" ] && command -v nvidia-smi &> /dev/null && nvidia-smi &> /dev/null; then
-            # Test CUDA availability with proper library paths
-            local cuda_test_result=1
-            if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-                LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}" "$COMFY_VENV/bin/python" -c "import torch; exit(0 if torch.cuda.is_available() else 1)" 2>/dev/null && cuda_test_result=0
-            else
-                "$COMFY_VENV/bin/python" -c "import torch; exit(0 if torch.cuda.is_available() else 1)" 2>/dev/null && cuda_test_result=0
-            fi
-            
-            if [ $cuda_test_result -ne 0 ]; then
-                log_warn "CUDA not available in current PyTorch installation"
-                log_info "Reinstalling PyTorch with CUDA support..."
-                local TORCH_INSTALL=$(detect_pytorch_version)
-                "$COMFY_VENV/bin/pip" uninstall -y torch torchvision torchaudio
-                "$COMFY_VENV/bin/pip" install $TORCH_INSTALL
-                # Mark as checked after successful installation
-                touch "$cuda_check_file"
-            else
-                log_info "PyTorch already has CUDA support"
-                touch "$cuda_check_file"
-            fi
+
+        # Record installed version
+        echo "$COMFY_VERSION" > "$version_file"
+        log_info "Python environment setup complete for ComfyUI $COMFY_VERSION"
+
+        # Clear CUDA check file to re-verify after update
+        rm -f "$COMFY_VENV/.cuda_checked"
+    fi
+
+    # Check if we need to upgrade PyTorch for GPU support
+    local cuda_check_file="$COMFY_VENV/.cuda_checked"
+    if [ ! -f "$cuda_check_file" ] && command -v nvidia-smi &> /dev/null && nvidia-smi &> /dev/null; then
+        # Test CUDA availability with proper library paths
+        local cuda_test_result=1
+        if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+            LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}" "$COMFY_VENV/bin/python" -c "import torch; exit(0 if torch.cuda.is_available() else 1)" 2>/dev/null && cuda_test_result=0
         else
-            log_debug "Skipping CUDA check (already verified)"
+            "$COMFY_VENV/bin/python" -c "import torch; exit(0 if torch.cuda.is_available() else 1)" 2>/dev/null && cuda_test_result=0
         fi
+
+        if [ $cuda_test_result -ne 0 ]; then
+            log_warn "CUDA not available in current PyTorch installation"
+            log_info "Reinstalling PyTorch with CUDA support..."
+            local TORCH_INSTALL=$(detect_pytorch_version)
+            "$COMFY_VENV/bin/pip" uninstall -y torch torchvision torchaudio
+            "$COMFY_VENV/bin/pip" install $TORCH_INSTALL
+            touch "$cuda_check_file"
+        else
+            log_info "PyTorch already has CUDA support"
+            touch "$cuda_check_file"
+        fi
+    else
+        log_debug "Skipping CUDA check (already verified)"
     fi
 }
 

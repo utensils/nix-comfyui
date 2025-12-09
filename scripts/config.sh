@@ -75,7 +75,8 @@ declare -A DIRECTORIES=(
 
 # Python packages to install
 BASE_PACKAGES="pyyaml pillow numpy requests"
-ADDITIONAL_PACKAGES="spandrel av GitPython toml rich safetensors"
+# Core packages needed for ComfyUI v0.3.76+
+ADDITIONAL_PACKAGES="spandrel av GitPython toml rich safetensors pydantic pydantic-settings alembic"
 
 # PyTorch installation will be determined dynamically based on GPU availability
 # This is set in install.sh based on platform detection
