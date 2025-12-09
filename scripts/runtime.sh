@@ -26,7 +26,7 @@ check_port() {
                 ;;
             *)
                 log_info "Opening browser to existing ComfyUI"
-                open "http://127.0.0.1:$COMFY_PORT"
+                open_browser "http://127.0.0.1:$COMFY_PORT"
                 exit 0
                 ;;
         esac
@@ -95,7 +95,7 @@ start_with_browser() {
     done
     
     log_info "ComfyUI started! Opening browser..."
-    open "http://127.0.0.1:$COMFY_PORT"
+    open_browser "http://127.0.0.1:$COMFY_PORT"
     
     # Wait for the process to finish
     while kill -0 $PID 2>/dev/null; do

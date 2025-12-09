@@ -13,6 +13,14 @@
       flake-utils,
       ...
     }:
+    let
+      # Version configuration - single source of truth
+      comfyuiVersion = "0.3.76";
+      comfyuiRev = "30c259cac8c08ff8d015f9aff3151cb525c9b702";
+      comfyuiHash = "sha256-RBVmggtQKopoygsm3CiMSJt2PucO0ou2t7uXzASSZY8=";
+      frontendVersion = "1.34.7";
+      frontendHash = "sha256-K+xxz/fZsS5usLNpqFhfvJS+bwQ4yvhGJgSRVCRMYJE=";
+    in
     flake-utils.lib.eachDefaultSystem (
       system:
       let
@@ -29,19 +37,19 @@
         comfyui-src = pkgs.fetchFromGitHub {
           owner = "comfyanonymous";
           repo = "ComfyUI";
-          rev = "a14c2fc3565277dfe8ab0ecb22a86c1d0a1f72cf"; # v0.3.28
-          hash = "sha256-d+RxxBmkwuZwRvPfdHGjZ7pllvbIcoITn9Z/1k3m4KE=";
+          rev = comfyuiRev;
+          hash = comfyuiHash;
         };
 
         # ComfyUI frontend package
         comfyui-frontend-package = pkgs.python312Packages.buildPythonPackage {
           pname = "comfyui-frontend-package";
-          version = "1.17.0";
+          version = frontendVersion;
           format = "wheel";
 
           src = pkgs.fetchurl {
-            url = "https://files.pythonhosted.org/packages/py3/c/comfyui_frontend_package/comfyui_frontend_package-1.17.0-py3-none-any.whl";
-            hash = "sha256-g6P84Vkh81SYHkxgsHHSHAgrxV4tIdzcZ1q/PX7rEZE=";
+            url = "https://files.pythonhosted.org/packages/15/76/4102b054d0d955472307dc572a47c9b22cab826da0a2ef0434160dca9646/comfyui_frontend_package-${frontendVersion}-py3-none-any.whl";
+            hash = frontendHash;
           };
 
           doCheck = false;
@@ -126,9 +134,16 @@
         packages = rec {
           default = pkgs.stdenv.mkDerivation {
             pname = "comfy-ui";
-            version = "0.1.0";
+            version = comfyuiVersion;
 
             src = comfyui-src;
+
+            # Passthru for scripting and testing
+            passthru = {
+              inherit comfyui-src comfyui-frontend-package;
+              version = comfyuiVersion;
+              frontendVersion = frontendVersion;
+            };
 
             nativeBuildInputs = [
               pkgs.makeWrapper
@@ -216,6 +231,7 @@
                 "PYTHONUNBUFFERED=1"
                 "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
                 "LD_LIBRARY_PATH=${pkgs.stdenv.cc.cc.lib}/lib"
+                "CUDA_VERSION=cpu"
               ];
               ExposedPorts = {
                 "8188/tcp" = { };
@@ -223,6 +239,13 @@
               WorkingDir = "/data";
               Volumes = {
                 "/data" = { };
+              };
+              Labels = {
+                "org.opencontainers.image.title" = "ComfyUI";
+                "org.opencontainers.image.description" = "ComfyUI - The most powerful and modular diffusion model GUI";
+                "org.opencontainers.image.version" = comfyuiVersion;
+                "org.opencontainers.image.source" = "https://github.com/utensils/nix-comfyui";
+                "org.opencontainers.image.licenses" = "GPL-3.0";
               };
             };
           };
@@ -270,6 +293,7 @@
                 "LD_LIBRARY_PATH=${pkgs.stdenv.cc.cc.lib}/lib"
                 "NVIDIA_VISIBLE_DEVICES=all"
                 "NVIDIA_DRIVER_CAPABILITIES=compute,utility"
+                "CUDA_VERSION=cu124"
               ];
               ExposedPorts = {
                 "8188/tcp" = { };
@@ -279,7 +303,11 @@
                 "/data" = { };
               };
               Labels = {
+                "org.opencontainers.image.title" = "ComfyUI CUDA";
                 "org.opencontainers.image.description" = "ComfyUI with CUDA support for GPU acceleration";
+                "org.opencontainers.image.version" = comfyuiVersion;
+                "org.opencontainers.image.source" = "https://github.com/utensils/nix-comfyui";
+                "org.opencontainers.image.licenses" = "GPL-3.0";
                 "com.nvidia.volumes.needed" = "nvidia_driver";
               };
             };
@@ -331,16 +359,94 @@
             pkgs.stdenv.cc
             pkgs.libGL
             pkgs.libGLU
+            # Development tools
+            pkgs.git
+            pkgs.shellcheck
+            pkgs.shfmt
+            pkgs.nixfmt-rfc-style
+            pkgs.ruff
+            pkgs.jq
+            pkgs.curl
+          ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
+            # macOS-specific tools
+            pkgs.darwin.apple_sdk.frameworks.Metal
           ];
 
           shellHook = ''
             echo "ComfyUI development environment activated"
+            echo "  ComfyUI version: ${comfyuiVersion}"
+            echo "  Frontend version: ${frontendVersion}"
             export COMFY_USER_DIR="$HOME/.config/comfy-ui"
             mkdir -p "$COMFY_USER_DIR"
             echo "User data will be stored in $COMFY_USER_DIR"
             export PYTHONPATH="$PWD:$PYTHONPATH"
           '';
         };
+
+        # Formatter for `nix fmt`
+        formatter = pkgs.nixfmt-rfc-style;
+
+        # Checks for CI
+        checks = {
+          # Verify the package builds
+          package = packages.default;
+
+          # Shell script linting
+          shellcheck = pkgs.runCommand "shellcheck" { nativeBuildInputs = [ pkgs.shellcheck ]; } ''
+            shellcheck ${./scripts}/*.sh
+            touch $out
+          '';
+
+          # Nix formatting check
+          nixfmt = pkgs.runCommand "nixfmt-check" { nativeBuildInputs = [ pkgs.nixfmt-rfc-style ]; } ''
+            nixfmt --check ${./flake.nix}
+            touch $out
+          '';
+        };
       }
-    );
+    )
+    // {
+      # Overlay for integrating with other flakes
+      overlays.default = final: prev: {
+        comfy-ui = self.packages.${final.system}.default;
+      };
+
+      # Update helper script (run with: nix run .#update)
+      apps.x86_64-linux.update = self.apps.x86_64-darwin.update;
+      apps.aarch64-linux.update = self.apps.aarch64-darwin.update;
+      apps.x86_64-darwin.update = {
+        type = "app";
+        program = toString (
+          nixpkgs.legacyPackages.x86_64-darwin.writeShellScript "update-comfyui" ''
+            set -e
+            echo "Fetching latest ComfyUI release..."
+            LATEST=$(curl -s https://api.github.com/repos/comfyanonymous/ComfyUI/releases/latest | ${nixpkgs.legacyPackages.x86_64-darwin.jq}/bin/jq -r '.tag_name')
+            echo "Latest version: $LATEST"
+            echo ""
+            echo "To update, modify these values in flake.nix:"
+            echo "  comfyuiVersion = \"''${LATEST#v}\";"
+            echo ""
+            echo "Then run: nix flake update"
+            echo "And update the hash with: nix build 2>&1 | grep 'got:' | awk '{print \$2}'"
+          ''
+        );
+      };
+      apps.aarch64-darwin.update = {
+        type = "app";
+        program = toString (
+          nixpkgs.legacyPackages.aarch64-darwin.writeShellScript "update-comfyui" ''
+            set -e
+            echo "Fetching latest ComfyUI release..."
+            LATEST=$(curl -s https://api.github.com/repos/comfyanonymous/ComfyUI/releases/latest | ${nixpkgs.legacyPackages.aarch64-darwin.jq}/bin/jq -r '.tag_name')
+            echo "Latest version: $LATEST"
+            echo ""
+            echo "To update, modify these values in flake.nix:"
+            echo "  comfyuiVersion = \"''${LATEST#v}\";"
+            echo ""
+            echo "Then run: nix flake update"
+            echo "And update the hash with: nix build 2>&1 | grep 'got:' | awk '{print \$2}'"
+          ''
+        );
+      };
+    };
 }

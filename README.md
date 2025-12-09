@@ -21,9 +21,13 @@ nix run github:utensils/nix-comfyui -- --open
 - Hybrid approach: Nix for environment management, pip for Python dependencies
 - Cross-platform support: macOS (Intel/Apple Silicon) and Linux
 - Automatic GPU detection: CUDA on Linux, MPS on Apple Silicon
-- Persistent user data directory
+- Configurable CUDA version via `CUDA_VERSION` environment variable
+- Persistent user data directory with automatic version upgrades
 - Includes ComfyUI-Manager for easy extension installation
 - Improved model download experience with automatic backend downloads
+- Flake checks for CI validation (`nix flake check`)
+- Built-in formatter (`nix fmt`)
+- Overlay for easy integration with other flakes
 
 ## Additional Options
 
@@ -38,11 +42,36 @@ nix run github:utensils/nix-comfyui/[commit-hash] -- --open
 - `--port=XXXX`: Run ComfyUI on a specific port (default: 8188)
 - `--debug` or `--verbose`: Enable detailed debug logging
 
+### Environment Variables
+
+- `CUDA_VERSION`: CUDA version for PyTorch (default: `cu124`, options: `cu118`, `cu121`, `cu124`, `cpu`)
+- `COMFY_USER_DIR`: Override the default user data directory (default: `~/.config/comfy-ui`)
+
+```bash
+# Example: Use CUDA 12.1
+CUDA_VERSION=cu121 nix run github:utensils/nix-comfyui
+```
+
 ### Development Shell
 
 ```bash
 # Enter a development shell with all dependencies
 nix develop
+```
+
+The development shell includes: Python 3.12, git, shellcheck, shfmt, nixfmt, ruff, jq, and curl.
+
+### Flake Commands
+
+```bash
+# Format all Nix files
+nix fmt
+
+# Run CI checks (build, shellcheck, nixfmt)
+nix flake check
+
+# Check for ComfyUI updates
+nix run .#update
 ```
 
 ### Installation
@@ -59,7 +88,32 @@ The flake is designed to be simple and extensible. You can customize it by:
 
 1. Adding Python packages in the `pythonEnv` definition
 2. Modifying the launcher script in `scripts/launcher.sh`
-3. Pinning to a specific ComfyUI version by changing the `rev` in `fetchFromGitHub`
+3. Pinning to a specific ComfyUI version by changing the version variables at the top of `flake.nix`
+
+### Using the Overlay
+
+You can integrate this flake into your own Nix configuration using the overlay:
+
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nix-comfyui.url = "github:utensils/nix-comfyui";
+  };
+
+  outputs = { self, nixpkgs, nix-comfyui }: {
+    # Use in NixOS configuration
+    nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
+      modules = [
+        ({ pkgs, ... }: {
+          nixpkgs.overlays = [ nix-comfyui.overlays.default ];
+          environment.systemPackages = [ pkgs.comfy-ui ];
+        })
+      ];
+    };
+  };
+}
+```
 
 ### Project Structure
 
@@ -104,21 +158,21 @@ This structure ensures your models, outputs, and custom nodes persist between ap
 
 ### Apple Silicon Support
 
-- Uses PyTorch nightly builds with improved MPS (Metal Performance Shaders) support
+- Uses stable PyTorch releases with MPS (Metal Performance Shaders) support
 - Enables FP16 precision mode for better performance
 - Sets optimal memory management parameters for macOS
 
 ### Linux Support
 
 - Automatic NVIDIA GPU detection and CUDA setup
-- Supports CUDA 12.4 for maximum compatibility
+- Configurable CUDA version (default: 12.4, supports 11.8, 12.1, 12.4)
 - Automatic library path configuration for system libraries
 - Falls back to CPU-only mode if no GPU is detected
 
 ### GPU Detection
 
 The flake automatically detects your hardware and installs the appropriate PyTorch version:
-- **Linux with NVIDIA GPU**: PyTorch with CUDA 12.4 support
+- **Linux with NVIDIA GPU**: PyTorch with CUDA support (configurable via `CUDA_VERSION`)
 - **macOS with Apple Silicon**: PyTorch with MPS acceleration
 - **Other systems**: CPU-only PyTorch
 
@@ -126,11 +180,16 @@ The flake automatically detects your hardware and installs the appropriate PyTor
 
 This flake currently provides:
 
-- ComfyUI v0.3.28
-- Python 3.12.9
-- PyTorch nightly builds with Apple Silicon optimizations
-- ComfyUI Frontend Package 1.17.0
+- ComfyUI v0.3.76
+- Python 3.12
+- PyTorch stable releases (with MPS support on Apple Silicon, CUDA on Linux)
+- ComfyUI Frontend Package 1.34.7
 - ComfyUI-Manager for extension management
+
+To check for updates:
+```bash
+nix run .#update
+```
 
 ## Model Downloading Patch
 

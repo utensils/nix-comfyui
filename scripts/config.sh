@@ -21,8 +21,12 @@ debug_vars() {
 trap 'echo "ERROR in config.sh: Command failed with exit code $? at line $LINENO"' ERR
 
 # Version and port configuration
-COMFY_VERSION="0.3.28"
+COMFY_VERSION="0.3.76"
 COMFY_PORT="8188"
+
+# CUDA configuration (can be overridden via environment)
+# Supported versions: cu118, cu121, cu124, cpu
+CUDA_VERSION="${CUDA_VERSION:-cu124}"
 
 # Directory structure
 BASE_DIR="$HOME/.config/comfy-ui"
@@ -71,7 +75,8 @@ declare -A DIRECTORIES=(
 
 # Python packages to install
 BASE_PACKAGES="pyyaml pillow numpy requests"
-ADDITIONAL_PACKAGES="spandrel av GitPython toml rich safetensors"
+# Core packages needed for ComfyUI v0.3.76+
+ADDITIONAL_PACKAGES="spandrel av GitPython toml rich safetensors pydantic pydantic-settings alembic"
 
 # PyTorch installation will be determined dynamically based on GPU availability
 # This is set in install.sh based on platform detection
