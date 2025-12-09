@@ -29,19 +29,19 @@
         comfyui-src = pkgs.fetchFromGitHub {
           owner = "comfyanonymous";
           repo = "ComfyUI";
-          rev = "a14c2fc3565277dfe8ab0ecb22a86c1d0a1f72cf"; # v0.3.28
-          hash = "sha256-d+RxxBmkwuZwRvPfdHGjZ7pllvbIcoITn9Z/1k3m4KE=";
+          rev = "30c259cac8c08ff8d015f9aff3151cb525c9b702"; # v0.3.76
+          hash = "sha256-RBVmggtQKopoygsm3CiMSJt2PucO0ou2t7uXzASSZY8=";
         };
 
         # ComfyUI frontend package
         comfyui-frontend-package = pkgs.python312Packages.buildPythonPackage {
           pname = "comfyui-frontend-package";
-          version = "1.17.0";
+          version = "1.34.7";
           format = "wheel";
 
           src = pkgs.fetchurl {
-            url = "https://files.pythonhosted.org/packages/py3/c/comfyui_frontend_package/comfyui_frontend_package-1.17.0-py3-none-any.whl";
-            hash = "sha256-g6P84Vkh81SYHkxgsHHSHAgrxV4tIdzcZ1q/PX7rEZE=";
+            url = "https://files.pythonhosted.org/packages/15/76/4102b054d0d955472307dc572a47c9b22cab826da0a2ef0434160dca9646/comfyui_frontend_package-1.34.7-py3-none-any.whl";
+            hash = "sha256-K+xxz/fZsS5usLNpqFhfvJS+bwQ4yvhGJgSRVCRMYJE=";
           };
 
           doCheck = false;
@@ -216,6 +216,7 @@
                 "PYTHONUNBUFFERED=1"
                 "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
                 "LD_LIBRARY_PATH=${pkgs.stdenv.cc.cc.lib}/lib"
+                "CUDA_VERSION=cpu"
               ];
               ExposedPorts = {
                 "8188/tcp" = { };
@@ -223,6 +224,13 @@
               WorkingDir = "/data";
               Volumes = {
                 "/data" = { };
+              };
+              Labels = {
+                "org.opencontainers.image.title" = "ComfyUI";
+                "org.opencontainers.image.description" = "ComfyUI - The most powerful and modular diffusion model GUI";
+                "org.opencontainers.image.version" = "0.3.76";
+                "org.opencontainers.image.source" = "https://github.com/utensils/nix-comfyui";
+                "org.opencontainers.image.licenses" = "GPL-3.0";
               };
             };
           };
@@ -270,6 +278,7 @@
                 "LD_LIBRARY_PATH=${pkgs.stdenv.cc.cc.lib}/lib"
                 "NVIDIA_VISIBLE_DEVICES=all"
                 "NVIDIA_DRIVER_CAPABILITIES=compute,utility"
+                "CUDA_VERSION=cu124"
               ];
               ExposedPorts = {
                 "8188/tcp" = { };
@@ -279,7 +288,11 @@
                 "/data" = { };
               };
               Labels = {
+                "org.opencontainers.image.title" = "ComfyUI CUDA";
                 "org.opencontainers.image.description" = "ComfyUI with CUDA support for GPU acceleration";
+                "org.opencontainers.image.version" = "0.3.76";
+                "org.opencontainers.image.source" = "https://github.com/utensils/nix-comfyui";
+                "org.opencontainers.image.licenses" = "GPL-3.0";
                 "com.nvidia.volumes.needed" = "nvidia_driver";
               };
             };

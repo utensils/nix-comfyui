@@ -21,8 +21,12 @@ debug_vars() {
 trap 'echo "ERROR in config.sh: Command failed with exit code $? at line $LINENO"' ERR
 
 # Version and port configuration
-COMFY_VERSION="0.3.28"
+COMFY_VERSION="0.3.76"
 COMFY_PORT="8188"
+
+# CUDA configuration (can be overridden via environment)
+# Supported versions: cu118, cu121, cu124, cpu
+CUDA_VERSION="${CUDA_VERSION:-cu124}"
 
 # Directory structure
 BASE_DIR="$HOME/.config/comfy-ui"

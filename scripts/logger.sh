@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # logger.sh: Logging utilities for ComfyUI launcher
 
+# Guard against multiple sourcing
+[[ -n "${_LOGGER_SH_SOURCED:-}" ]] && return
+_LOGGER_SH_SOURCED=1
+
 # ANSI color codes
 RESET="\033[0m"
 RED="\033[1;31m"
@@ -109,4 +113,31 @@ display_notices() {
     echo -e "${YELLOW}NOTE:${RESET} First time startup may take several minutes while dependencies are downloaded."
     echo -e "${YELLOW}NOTE:${RESET} Models will be downloaded automatically when selected in the UI."
     echo -e "\nTo open manually: open http://127.0.0.1:$COMFY_PORT"
+}
+
+# Cross-platform browser opening function
+open_browser() {
+    local url="$1"
+    case "$OSTYPE" in
+        darwin*)
+            open "$url"
+            ;;
+        linux*)
+            if command -v xdg-open &> /dev/null; then
+                xdg-open "$url"
+            elif command -v gnome-open &> /dev/null; then
+                gnome-open "$url"
+            elif command -v kde-open &> /dev/null; then
+                kde-open "$url"
+            else
+                log_warn "No browser opener found. Please open: $url"
+            fi
+            ;;
+        msys*|cygwin*|mingw*)
+            start "$url"
+            ;;
+        *)
+            log_warn "Unknown platform. Please open: $url"
+            ;;
+    esac
 }

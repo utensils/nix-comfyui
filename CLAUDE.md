@@ -22,9 +22,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Lint**: `ruff check src/` (checks for code issues)
 
 ## Version Management
-- Current ComfyUI version: v0.3.28 (pinned in `flake.nix`)
+- Current ComfyUI version: v0.3.76 (pinned in `flake.nix`)
 - To update ComfyUI: modify `rev` and `hash` in `comfyui-src` fetchFromGitHub block
-- Frontend package version: 1.17.0 (update in `comfyui-frontend-package`)
+- Frontend package version: 1.34.7 (update in `comfyui-frontend-package`)
+- Python version: 3.12 (stable for ML workloads)
+- PyTorch: Stable releases (no nightly builds)
 
 ## Project Architecture
 
@@ -53,6 +55,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `COMFY_USER_DIR`: Persistent storage directory (default: `~/.config/comfy-ui`)
 - `COMFY_APP_DIR`: ComfyUI application directory
 - `COMFY_SAVE_PATH`: User save path for outputs
+- `CUDA_VERSION`: CUDA version for PyTorch (default: `cu124`, options: `cu118`, `cu121`, `cu124`, `cpu`)
 - `LD_LIBRARY_PATH`: (Linux) Set automatically to include system libraries and NVIDIA drivers
 - `DYLD_LIBRARY_PATH`: (macOS) Set if needed for dynamic libraries
 
@@ -104,3 +107,5 @@ venv/          - Python virtual environment
 - **Configuration**: Keep all configurable variables in config.sh
 - **Documentation**: Include clear comments and function documentation
 - **Strict Mode**: Use appropriate strictness flags (set -u -o pipefail)
+- **Source Guards**: Use guard clauses to prevent multiple sourcing (e.g., `[[ -n "${_SCRIPT_SOURCED:-}" ]] && return`)
+- **Cross-Platform**: Use `open_browser()` function from logger.sh instead of platform-specific commands

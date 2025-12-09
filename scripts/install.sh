@@ -26,26 +26,39 @@ create_directories() {
 # Install ComfyUI core
 install_comfyui() {
     log_section "Installing ComfyUI $COMFY_VERSION"
-    
+
     # Remove existing directory (but keep symlinked content safe)
     log_info "Preparing fresh installation in $CODE_DIR"
     rm -rf "$CODE_DIR"
     mkdir -p "$CODE_DIR"
-    
+
     # Copy the ComfyUI source
     log_info "Copying ComfyUI source code"
     cp -r "$COMFYUI_SRC"/* "$CODE_DIR/"
     echo "$COMFY_VERSION" > "$CODE_DIR/VERSION"
-    
+
     # Copy persistence scripts
     cp -f "$PERSISTENCE_MAIN_SCRIPT" "$CODE_DIR/persistent_main.py" 2>/dev/null || true
-    
+
     # Ensure proper permissions
     chmod -R u+rw "$CODE_DIR"
-    
+
+    # Initialize a git repo to satisfy ComfyUI-Manager's version check
+    # Nix manages the actual version, but Manager expects a git repo
+    log_info "Initializing git repo for ComfyUI-Manager compatibility"
+    (
+        cd "$CODE_DIR"
+        git init -q
+        git config user.email "nix@localhost"
+        git config user.name "Nix Build"
+        git add -A
+        git commit -q -m "ComfyUI v$COMFY_VERSION (managed by nix-comfyui)"
+        git tag -a "v$COMFY_VERSION" -m "Version $COMFY_VERSION"
+    ) 2>/dev/null || log_warn "Could not initialize git repo"
+
     # Ensure model directories exist in the CODE_DIR for symlinks
     mkdir -p "$CODE_DIR/models"
-    
+
     log_info "ComfyUI core installed successfully"
 }
 
@@ -64,11 +77,14 @@ install_comfyui_manager() {
     fi
     
     # Create ComfyUI-Manager config
+    # Note: ComfyUI version is managed by Nix, so we disable some update features
     mkdir -p "$CODE_DIR/user/default/ComfyUI-Manager"
     cat > "$CODE_DIR/user/default/ComfyUI-Manager/config.ini" << 'CONFIG_EOF'
 [default]
 config_version=0.7
+
 [manager]
+# Model directories (relative to ComfyUI root)
 control_net_model_dir=\models\controlnet
 upscale_model_dir=\models\upscale_models
 lora_model_dir=\models\loras
@@ -79,8 +95,16 @@ custom_nodes_dir=custom_nodes
 clip_vision_dir=\models\clip_vision
 embedding_dir=\models\embeddings
 loras_dir=\models\loras
+
+# Security and hosting
 prevent_direct_install=True
 privileged_hosting=False
+
+# Nix-managed installation settings
+# ComfyUI core updates are handled by nix-comfyui flake
+# Custom nodes can still be managed through ComfyUI-Manager
+skip_update_check=True
+file_logging=True
 CONFIG_EOF
 
     log_info "ComfyUI-Manager setup completed"
@@ -115,28 +139,33 @@ install_model_downloader() {
 }
 
 # Detect GPU and determine PyTorch installation
+# Uses stable PyTorch releases instead of nightly builds for production stability
+# CUDA version can be configured via CUDA_VERSION environment variable
 detect_pytorch_version() {
     local TORCH_INSTALL=""
-    
+    local cuda_ver="${CUDA_VERSION:-cu124}"
+
     # Check for NVIDIA GPU
     if command -v nvidia-smi &> /dev/null; then
         log_info "NVIDIA GPU detected"
         if nvidia-smi &> /dev/null; then
             log_info "NVIDIA driver is functional"
-            # Install PyTorch with CUDA support
-            TORCH_INSTALL="--pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu124"
+            log_info "Using CUDA version: $cuda_ver (override with CUDA_VERSION env var)"
+            # Install stable PyTorch with CUDA support
+            TORCH_INSTALL="torch torchvision torchaudio --index-url https://download.pytorch.org/whl/${cuda_ver}"
         else
             log_warn "NVIDIA driver not functioning properly, falling back to CPU"
-            TORCH_INSTALL="--pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu"
+            TORCH_INSTALL="torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu"
         fi
     elif [[ "$OSTYPE" == "darwin"* ]] && [[ $(uname -m) == "arm64" ]]; then
         log_info "Apple Silicon detected, using MPS acceleration"
-        TORCH_INSTALL="--pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu"
+        # On macOS, use default PyPI packages which include MPS support
+        TORCH_INSTALL="torch torchvision torchaudio"
     else
         log_info "No GPU detected, using CPU-only PyTorch"
-        TORCH_INSTALL="--pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu"
+        TORCH_INSTALL="torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu"
     fi
-    
+
     echo "$TORCH_INSTALL"
 }
 
