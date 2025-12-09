@@ -45,10 +45,11 @@ install_comfyui() {
 
     # Initialize a git repo to satisfy ComfyUI-Manager's version check
     # Nix manages the actual version, but Manager expects a git repo
+    # Note: Manager expects 'master' branch, not 'main'
     log_info "Initializing git repo for ComfyUI-Manager compatibility"
     (
         cd "$CODE_DIR"
-        git init -q
+        git init -q -b master
         git config user.email "nix@localhost"
         git config user.name "Nix Build"
         git add -A
@@ -97,7 +98,10 @@ embedding_dir=\models\embeddings
 loras_dir=\models\loras
 
 # Security and hosting
-prevent_direct_install=True
+# Security levels: strict, normal, middle, weak, normal-
+# 'middle' allows custom node management while maintaining reasonable security
+security_level=middle
+prevent_direct_install=False
 privileged_hosting=False
 
 # Nix-managed installation settings
