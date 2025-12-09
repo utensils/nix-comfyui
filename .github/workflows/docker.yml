@@ -48,7 +48,7 @@ jobs:
             accept-flake-config = true
 
       - name: Setup Cachix
-        if: secrets.CACHIX_AUTH_TOKEN != ''
+        if: ${{ secrets.CACHIX_AUTH_TOKEN != '' }}
         uses: cachix/cachix-action@v15
         with:
           name: nix-comfyui
