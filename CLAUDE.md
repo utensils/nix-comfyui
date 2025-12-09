@@ -13,8 +13,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Run with network access**: `nix run -- --listen 0.0.0.0` (allow external connections)
 - **Run with debug logging**: `nix run -- --debug` or `nix run -- --verbose`
 - **Build with Nix**: `nix build` (builds the app without running)
-- **Build Docker image**: `nix run .#buildDocker` (creates `comfy-ui:latest` image) ⚠️ Partially implemented
-- **Build CUDA Docker**: `nix run .#buildDockerCuda` (creates `comfy-ui:cuda` image) ⚠️ Partially implemented
+- **Build Docker image**: `nix run .#buildDocker` (creates `comfy-ui:latest` image)
+- **Build CUDA Docker**: `nix run .#buildDockerCuda` (creates `comfy-ui:cuda` image)
 - **Run Docker container**: `docker run -p 8188:8188 -v $PWD/data:/data comfy-ui:latest`
 - **Run CUDA Docker**: `docker run --gpus all -p 8188:8188 -v $PWD/data:/data comfy-ui:cuda`
 - **Develop with Nix**: `nix develop` (opens development shell)

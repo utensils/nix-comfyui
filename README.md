@@ -233,9 +233,7 @@ This structure ensures clear separation of concerns and makes the codebase easie
 
 ## Docker Support
 
-> **⚠️ WARNING: Docker support is partially implemented but not yet functional. Cross-compilation for Linux is needed to complete the implementation. This will be addressed in a future update.**
-
-This flake includes preliminary Docker support, aimed at running ComfyUI in a containerized environment while preserving all functionality.
+This flake includes Docker support for running ComfyUI in a containerized environment while preserving all functionality. Both CPU and CUDA-enabled GPU images are available.
 
 ### Building the Docker Image
 

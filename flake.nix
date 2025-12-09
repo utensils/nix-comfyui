@@ -319,7 +319,7 @@
         inherit packages;
 
         # Define apps
-        apps = {
+        apps = rec {
           default = flake-utils.lib.mkApp {
             drv = packages.default;
             name = "comfy-ui";
@@ -350,6 +350,45 @@
             '';
             name = "build-docker-cuda";
           };
+
+          # Update helper script
+          update =
+            if pkgs.stdenv.isDarwin then
+              {
+                type = "app";
+                program = toString (
+                  pkgs.writeShellScript "update-comfyui" ''
+                    set -e
+                    echo "Fetching latest ComfyUI release..."
+                    LATEST=$(curl -s https://api.github.com/repos/comfyanonymous/ComfyUI/releases/latest | ${pkgs.jq}/bin/jq -r '.tag_name')
+                    echo "Latest version: $LATEST"
+                    echo ""
+                    echo "To update, modify these values in flake.nix:"
+                    echo "  comfyuiVersion = \"''${LATEST#v}\";"
+                    echo ""
+                    echo "Then run: nix flake update"
+                    echo "And update the hash with: nix build 2>&1 | grep 'got:' | awk '{print \$2}'"
+                  ''
+                );
+              }
+            else
+              {
+                type = "app";
+                program = toString (
+                  pkgs.writeShellScript "update-comfyui" ''
+                    set -e
+                    echo "Fetching latest ComfyUI release..."
+                    LATEST=$(curl -s https://api.github.com/repos/comfyanonymous/ComfyUI/releases/latest | ${pkgs.jq}/bin/jq -r '.tag_name')
+                    echo "Latest version: $LATEST"
+                    echo ""
+                    echo "To update, modify these values in flake.nix:"
+                    echo "  comfyuiVersion = \"''${LATEST#v}\";"
+                    echo ""
+                    echo "Then run: nix flake update"
+                    echo "And update the hash with: nix build 2>&1 | grep 'got:' | awk '{print \$2}'"
+                  ''
+                );
+              };
         };
 
         # Define development shell
@@ -409,44 +448,6 @@
       # Overlay for integrating with other flakes
       overlays.default = final: prev: {
         comfy-ui = self.packages.${final.system}.default;
-      };
-
-      # Update helper script (run with: nix run .#update)
-      apps.x86_64-linux.update = self.apps.x86_64-darwin.update;
-      apps.aarch64-linux.update = self.apps.aarch64-darwin.update;
-      apps.x86_64-darwin.update = {
-        type = "app";
-        program = toString (
-          nixpkgs.legacyPackages.x86_64-darwin.writeShellScript "update-comfyui" ''
-            set -e
-            echo "Fetching latest ComfyUI release..."
-            LATEST=$(curl -s https://api.github.com/repos/comfyanonymous/ComfyUI/releases/latest | ${nixpkgs.legacyPackages.x86_64-darwin.jq}/bin/jq -r '.tag_name')
-            echo "Latest version: $LATEST"
-            echo ""
-            echo "To update, modify these values in flake.nix:"
-            echo "  comfyuiVersion = \"''${LATEST#v}\";"
-            echo ""
-            echo "Then run: nix flake update"
-            echo "And update the hash with: nix build 2>&1 | grep 'got:' | awk '{print \$2}'"
-          ''
-        );
-      };
-      apps.aarch64-darwin.update = {
-        type = "app";
-        program = toString (
-          nixpkgs.legacyPackages.aarch64-darwin.writeShellScript "update-comfyui" ''
-            set -e
-            echo "Fetching latest ComfyUI release..."
-            LATEST=$(curl -s https://api.github.com/repos/comfyanonymous/ComfyUI/releases/latest | ${nixpkgs.legacyPackages.aarch64-darwin.jq}/bin/jq -r '.tag_name')
-            echo "Latest version: $LATEST"
-            echo ""
-            echo "To update, modify these values in flake.nix:"
-            echo "  comfyuiVersion = \"''${LATEST#v}\";"
-            echo ""
-            echo "Then run: nix flake update"
-            echo "And update the hash with: nix build 2>&1 | grep 'got:' | awk '{print \$2}'"
-          ''
-        );
       };
     };
 }
