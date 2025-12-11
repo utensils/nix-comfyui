@@ -25,8 +25,9 @@ nix run github:utensils/nix-comfyui -- --open
 - Persistent user data directory with automatic version upgrades
 - Includes ComfyUI-Manager for easy extension installation
 - Improved model download experience with automatic backend downloads
-- Flake checks for CI validation (`nix flake check`)
-- Built-in formatter (`nix fmt`)
+- Code quality tooling: ruff (linter/formatter), pyright (type checker), shellcheck
+- CI validation with `nix flake check` (build, lint, type-check, shellcheck, nixfmt)
+- Built-in formatters: `nix fmt` (Nix files), `nix run .#format` (Python files)
 - Overlay for easy integration with other flakes
 
 ## Additional Options
@@ -59,15 +60,24 @@ CUDA_VERSION=cu121 nix run github:utensils/nix-comfyui
 nix develop
 ```
 
-The development shell includes: Python 3.12, git, shellcheck, shfmt, nixfmt, ruff, jq, and curl.
+The development shell includes: Python 3.12, git, shellcheck, shfmt, nixfmt, ruff, pyright, jq, and curl.
 
-### Flake Commands
+### Code Quality and CI
 
 ```bash
-# Format all Nix files
+# Format Nix files
 nix fmt
 
-# Run CI checks (build, shellcheck, nixfmt)
+# Format Python code
+nix run .#format
+
+# Lint Python code
+nix run .#lint
+
+# Type check Python code
+nix run .#type-check
+
+# Run all checks (build, lint, type-check, shellcheck, nixfmt)
 nix flake check
 
 # Check for ComfyUI updates
@@ -180,11 +190,11 @@ The flake automatically detects your hardware and installs the appropriate PyTor
 
 This flake currently provides:
 
-- ComfyUI v0.3.76
+- ComfyUI v0.4.0
 - Python 3.12
 - PyTorch stable releases (with MPS support on Apple Silicon, CUDA on Linux)
-- ComfyUI Frontend Package 1.34.7
 - ComfyUI-Manager for extension management
+- Frontend managed via ComfyUI's requirements.txt
 
 To check for updates:
 ```bash
