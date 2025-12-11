@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # runtime.sh: Runtime functions for ComfyUI
 
+# Guard against multiple sourcing
+[[ -n "${_RUNTIME_SH_SOURCED:-}" ]] && return
+_RUNTIME_SH_SOURCED=1
+
 # Source shared libraries
 [ -z "$SCRIPT_DIR" ] && SCRIPT_DIR=$(dirname "${BASH_SOURCE[0]}")
 source "$SCRIPT_DIR/logger.sh"

@@ -219,6 +219,19 @@
               Volumes = {
                 "/data" = { };
               };
+              Healthcheck = {
+                Test = [
+                  "CMD"
+                  "nc"
+                  "-z"
+                  "localhost"
+                  "8188"
+                ];
+                Interval = 30000000000; # 30 seconds in nanoseconds
+                Timeout = 5000000000; # 5 seconds in nanoseconds
+                Retries = 3;
+                StartPeriod = 60000000000; # 60 seconds grace period for startup
+              };
               Labels = {
                 "org.opencontainers.image.title" = "ComfyUI";
                 "org.opencontainers.image.description" =
@@ -281,6 +294,19 @@
               WorkingDir = "/data";
               Volumes = {
                 "/data" = { };
+              };
+              Healthcheck = {
+                Test = [
+                  "CMD"
+                  "nc"
+                  "-z"
+                  "localhost"
+                  "8188"
+                ];
+                Interval = 30000000000; # 30 seconds in nanoseconds
+                Timeout = 5000000000; # 5 seconds in nanoseconds
+                Retries = 3;
+                StartPeriod = 60000000000; # 60 seconds grace period for startup
               };
               Labels = {
                 "org.opencontainers.image.title" = "ComfyUI CUDA";
@@ -349,49 +375,26 @@
             };
 
           # Update helper script
-          update =
-            if pkgs.stdenv.isDarwin then
-              {
-                type = "app";
-                program = toString (
-                  pkgs.writeShellScript "update-comfyui" ''
-                    set -e
-                    echo "Fetching latest ComfyUI release..."
-                    LATEST=$(curl -s https://api.github.com/repos/comfyanonymous/ComfyUI/releases/latest | ${pkgs.jq}/bin/jq -r '.tag_name')
-                    echo "Latest version: $LATEST"
-                    echo ""
-                    echo "To update, modify these values in flake.nix:"
-                    echo "  comfyuiVersion = \"''${LATEST#v}\";"
-                    echo ""
-                    echo "Then run: nix flake update"
-                    echo "And update the hash with: nix build 2>&1 | grep 'got:' | awk '{print \$2}'"
-                  ''
-                );
-                meta = {
-                  description = "Check for ComfyUI updates";
-                };
-              }
-            else
-              {
-                type = "app";
-                program = toString (
-                  pkgs.writeShellScript "update-comfyui" ''
-                    set -e
-                    echo "Fetching latest ComfyUI release..."
-                    LATEST=$(curl -s https://api.github.com/repos/comfyanonymous/ComfyUI/releases/latest | ${pkgs.jq}/bin/jq -r '.tag_name')
-                    echo "Latest version: $LATEST"
-                    echo ""
-                    echo "To update, modify these values in flake.nix:"
-                    echo "  comfyuiVersion = \"''${LATEST#v}\";"
-                    echo ""
-                    echo "Then run: nix flake update"
-                    echo "And update the hash with: nix build 2>&1 | grep 'got:' | awk '{print \$2}'"
-                  ''
-                );
-                meta = {
-                  description = "Check for ComfyUI updates";
-                };
-              };
+          update = {
+            type = "app";
+            program = toString (
+              pkgs.writeShellScript "update-comfyui" ''
+                set -e
+                echo "Fetching latest ComfyUI release..."
+                LATEST=$(curl -s https://api.github.com/repos/comfyanonymous/ComfyUI/releases/latest | ${pkgs.jq}/bin/jq -r '.tag_name')
+                echo "Latest version: $LATEST"
+                echo ""
+                echo "To update, modify these values in flake.nix:"
+                echo "  comfyuiVersion = \"''${LATEST#v}\";"
+                echo ""
+                echo "Then run: nix flake update"
+                echo "And update the hash with: nix build 2>&1 | grep 'got:' | awk '{print \$2}'"
+              ''
+            );
+            meta = {
+              description = "Check for ComfyUI updates";
+            };
+          };
 
           # Linting and formatting apps
           lint =

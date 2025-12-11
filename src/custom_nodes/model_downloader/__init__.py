@@ -1,17 +1,24 @@
 # Model Downloader Custom Node
+"""Custom node for downloading models in ComfyUI."""
+
+from __future__ import annotations
+
 import importlib.util
 import logging
 import os
 import sys
-import time
-import traceback
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from aiohttp import web
 
 # Setup logging
 logger = logging.getLogger("model_downloader")
 
 # This node doesn't add any actual nodes to the graph
-NODE_CLASS_MAPPINGS = {}
-NODE_DISPLAY_NAME_MAPPINGS = {}
+NODE_CLASS_MAPPINGS: dict[str, type[Any]] = {}
+NODE_DISPLAY_NAME_MAPPINGS: dict[str, str] = {}
 
 # Register the web extension directory for ComfyUI to find the JavaScript files
 WEB_DIRECTORY = os.path.join(os.path.dirname(os.path.realpath(__file__)), "js")
@@ -25,42 +32,71 @@ current_dir = os.path.dirname(os.path.realpath(__file__))
 if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
 
-# Import the model_downloader_patch module
+# Type aliases for handler functions
+DownloadHandler = Callable[["web.Request"], "web.Response"]
+
+# Import the model_downloader_patch module and get handler functions
+_download_model_handler: DownloadHandler | None = None
+_get_download_progress_handler: DownloadHandler | None = None
+_list_downloads_handler: DownloadHandler | None = None
+
 try:
-    # Import directly from current directory by filename
     spec = importlib.util.spec_from_file_location(
         "model_downloader_patch", os.path.join(current_dir, "model_downloader_patch.py")
     )
     if spec is None or spec.loader is None:
         msg = "Failed to load model_downloader_patch module"
         raise ImportError(msg)
+
     model_downloader_patch = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(model_downloader_patch)
 
     # Get the handler functions
-    download_model = model_downloader_patch.download_model
-    get_download_progress = model_downloader_patch.get_download_progress
-    list_downloads = model_downloader_patch.list_downloads
+    _download_model_handler = model_downloader_patch.download_model
+    _get_download_progress_handler = model_downloader_patch.get_download_progress
+    _list_downloads_handler = model_downloader_patch.list_downloads
 
     logger.info("Successfully imported model downloader module")
-except Exception:
+except ImportError:
     logger.exception("Error importing model_downloader_patch")
 
-    # Define dummy functions to avoid errors
+
+async def download_model(request: Any) -> Any:
+    """Download model handler - delegates to loaded module or returns error."""
+    if _download_model_handler is not None:
+        return await _download_model_handler(request)
     from aiohttp import web
-
-    async def download_model(request):
-        return web.json_response({"success": False, "error": "Model downloader not available"})
-
-    async def get_download_progress(request):
-        return web.json_response({"success": False, "error": "Model downloader not available"})
-
-    async def list_downloads(request):
-        return web.json_response({"success": False, "error": "Model downloader not available"})
+    return web.json_response({"success": False, "error": "Model downloader not available"})
 
 
-# Define API handler for ComfyUI extension system
-def setup_js_api(app, *args, **kwargs):
+async def get_download_progress(request: Any) -> Any:
+    """Get download progress handler - delegates to loaded module or returns error."""
+    if _get_download_progress_handler is not None:
+        return await _get_download_progress_handler(request)
+    from aiohttp import web
+    return web.json_response({"success": False, "error": "Model downloader not available"})
+
+
+async def list_downloads(request: Any) -> Any:
+    """List downloads handler - delegates to loaded module or returns error."""
+    if _list_downloads_handler is not None:
+        return await _list_downloads_handler(request)
+    from aiohttp import web
+    return web.json_response({"success": False, "error": "Model downloader not available"})
+
+
+def setup_js_api(app: Any, *args: Any, **kwargs: Any) -> Any:
+    """
+    Define API handler for ComfyUI extension system.
+
+    Args:
+        app: The aiohttp application instance.
+        *args: Additional positional arguments (unused).
+        **kwargs: Additional keyword arguments (unused).
+
+    Returns:
+        The modified app instance.
+    """
     try:
         from aiohttp import web
     except ImportError:
@@ -73,13 +109,13 @@ def setup_js_api(app, *args, **kwargs):
     route_patterns = ["/api/download-model", "/api/download-progress/", "/api/downloads"]
 
     # Check if any of our routes already exist
-    existing_routes = set()
+    existing_routes: set[str] = set()
     for route in app.router.routes():
         route_str = str(route)
         for pattern in route_patterns:
             if pattern in route_str:
                 existing_routes.add(pattern)
-                logger.info(f"Found existing route matching {pattern}")
+                logger.info("Found existing route matching %s", pattern)
 
     # Register each endpoint if it doesn't already exist
     if "/api/download-model" not in existing_routes:
@@ -100,8 +136,7 @@ def setup_js_api(app, *args, **kwargs):
 
 # Try to register immediately if PromptServer is available
 try:
-    from aiohttp import web
-    from server import PromptServer
+    from server import PromptServer  # type: ignore[import-not-found]
 
     logger.info("Attempting immediate API endpoint registration")
 
@@ -116,8 +151,8 @@ try:
         logger.warning(
             "PromptServer.instance not available yet, will register later via setup_js_api"
         )
-except Exception:
+except ImportError:
+    logger.debug("PromptServer not available, will register via setup_js_api")
+except AttributeError:
     logger.exception("Error during immediate API registration")
     logger.debug("Will try again when ComfyUI calls setup_js_api function")
-
-# Module initialization completed

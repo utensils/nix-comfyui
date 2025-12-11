@@ -11,6 +11,10 @@ on:
       - main
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
@@ -35,7 +39,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -48,13 +52,11 @@ jobs:
             accept-flake-config = true
 
       - name: Setup Cachix
-        if: env.CACHIX_AUTH_TOKEN != ''
-        env:
-          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+        if: ${{ secrets.CACHIX_AUTH_TOKEN != '' }}
         uses: cachix/cachix-action@v15
         with:
           name: nix-comfyui
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: Log in to Container Registry
         if: github.event_name != 'pull_request'
@@ -151,7 +153,7 @@ jobs:
       packages: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Update Container Registry description
         run: |

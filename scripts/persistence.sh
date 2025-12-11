@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # persistence.sh: Setup persistence for ComfyUI data
 
+# Guard against multiple sourcing
+[[ -n "${_PERSISTENCE_SH_SOURCED:-}" ]] && return
+_PERSISTENCE_SH_SOURCED=1
+
 # Source shared libraries
 [ -z "$SCRIPT_DIR" ] && SCRIPT_DIR=$(dirname "${BASH_SOURCE[0]}")
 source "$SCRIPT_DIR/logger.sh"

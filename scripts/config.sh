@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # config.sh: Configuration variables for ComfyUI launcher
 
+# Guard against multiple sourcing
+[[ -n "${_CONFIG_SH_SOURCED:-}" ]] && return
+_CONFIG_SH_SOURCED=1
+
 # Enable strict mode but with verbose error reporting
 set -uo pipefail
 
@@ -86,16 +90,16 @@ parse_arguments() {
   ARGS=()
   for arg in "$@"; do
     case "$arg" in
-      "--open")
+      --open)
         OPEN_BROWSER=true
         ;;
-      "--port=*")
+      --port=*)
         COMFY_PORT="${arg#*=}"
         ;;
-      "--debug")
+      --debug)
         export LOG_LEVEL=$DEBUG
         ;;
-      "--verbose")
+      --verbose)
         export LOG_LEVEL=$DEBUG
         ;;
       *)

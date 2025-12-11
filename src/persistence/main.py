@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-# Custom main.py to ensure path persistence in ComfyUI
+"""Custom main.py to ensure path persistence in ComfyUI."""
+
+from __future__ import annotations
 
 import logging
 import os
 import sys
+from typing import NoReturn
 
 # Configure logging
 logging.basicConfig(
@@ -11,88 +14,102 @@ logging.basicConfig(
 )
 logger = logging.getLogger("persistence")
 
-# Import our persistence module
-try:
-    # First try to import using relative import if this is run as part of a package
+
+def get_persistent_dir() -> str:
+    """Get or initialize the persistent directory."""
     try:
-        from .persistence import setup_persistence  # noqa: F401
+        # Try relative import first (when run as part of a package)
+        try:
+            from .persistence import setup_persistence
+        except ImportError:
+            # Fall back to absolute import based on file location
+            script_dir = os.path.dirname(os.path.realpath(__file__))
+            sys.path.insert(0, script_dir)
+            from persistence import setup_persistence
+
+        return setup_persistence()
     except ImportError:
-        # If that fails, try to import using an absolute path based on file location
-        script_dir = os.path.dirname(os.path.realpath(__file__))
-        sys.path.insert(0, script_dir)
-        import persistence  # noqa: F401
-
-    # Get the persistent directory but don't run the setup again
-    # The setup will be run when the module is imported
-    PERSISTENT_DIR = os.environ.get(
-        "COMFY_USER_DIR", os.path.join(os.path.expanduser("~"), ".config", "comfy-ui")
-    )
-except ImportError:
-    logger.exception("Could not import persistent module, falling back to basic setup")
-    # Define the persistent base directory - get from environment or use default
-    PERSISTENT_DIR = os.environ.get(
-        "COMFY_USER_DIR", os.path.join(os.path.expanduser("~"), ".config", "comfy-ui")
-    )
-    logger.info(f"Using persistent directory: {PERSISTENT_DIR}")
-
-# Force the base directory in command line arguments
-if "--base-directory" not in sys.argv:
-    sys.argv.append("--base-directory")
-    sys.argv.append(PERSISTENT_DIR)
-else:
-    # Find the index and replace its value
-    index = sys.argv.index("--base-directory")
-    if index + 1 < len(sys.argv):
-        sys.argv[index + 1] = PERSISTENT_DIR
-
-# Make sure the --persistent flag is set
-if "--persistent" not in sys.argv:
-    sys.argv.append("--persistent")
-
-# Output current arguments for debugging
-logger.info(f"Command line arguments: {sys.argv}")
-
-# Set environment variables
-os.environ["COMFY_USER_DIR"] = PERSISTENT_DIR
-os.environ["COMFY_SAVE_PATH"] = os.path.join(PERSISTENT_DIR, "user")
-
-# Import and run the original main
-app_dir = os.path.dirname(os.path.realpath(__file__))
-original_main = os.path.join(app_dir, "main.py")
-
-logger.info(f"Executing original main.py: {original_main}")
-
-# Make sure the app directory is in the Python path
-app_dir = os.path.dirname(original_main)
-sys.path.insert(0, app_dir)
-
-# Set current directory to the app directory to ensure relative imports work
-os.chdir(app_dir)
-
-# Set environment variable for the app directory so persistence.py can find it
-os.environ["COMFY_APP_DIR"] = app_dir
-
-# Ensure utils is recognized as a package if it exists
-utils_dir = os.path.join(app_dir, "utils")
-utils_init = os.path.join(utils_dir, "__init__.py")
-if os.path.exists(utils_dir) and os.path.isdir(utils_dir) and not os.path.exists(utils_init):
-    # Make sure __init__.py exists
-    with open(utils_init, "w") as f:
-        f.write("# Auto-generated __init__.py for utils package")
-
-# Instead of trying to execute the main.py file directly,
-# we'll use a simpler approach by directly running main.py as a subprocess
-# This avoids Python module import issues
+        logger.exception("Could not import persistence module, falling back to basic setup")
+        return os.environ.get(
+            "COMFY_USER_DIR", os.path.join(os.path.expanduser("~"), ".config", "comfy-ui")
+        )
 
 
-# Build the command to run main.py with all the valid arguments
-# Filter out the --persistent argument which is not recognized by main.py
-filtered_args = [arg for arg in sys.argv[1:] if arg != "--persistent"]
-cmd = [sys.executable, original_main, *filtered_args]
+def setup_command_line_args(persistent_dir: str) -> None:
+    """Configure command line arguments for persistence."""
+    # Force the base directory in command line arguments
+    if "--base-directory" not in sys.argv:
+        sys.argv.append("--base-directory")
+        sys.argv.append(persistent_dir)
+    else:
+        # Find the index and replace its value
+        try:
+            index = sys.argv.index("--base-directory")
+            if index + 1 < len(sys.argv):
+                sys.argv[index + 1] = persistent_dir
+        except ValueError:
+            pass
 
-# Log the command we're about to run
-logger.info(f"Running command: {' '.join(cmd)}")
+    # Ensure the --persistent flag is set (filtered out before execution)
+    if "--persistent" not in sys.argv:
+        sys.argv.append("--persistent")
 
-# Execute the command and replace the current process
-# Make sure to preserve all environment variables, especially LD_LIBRARY_PATH
-os.execve(sys.executable, cmd, os.environ)
+
+def ensure_utils_package(app_dir: str) -> None:
+    """Ensure utils is recognized as a package if it exists."""
+    utils_dir = os.path.join(app_dir, "utils")
+    utils_init = os.path.join(utils_dir, "__init__.py")
+    if os.path.exists(utils_dir) and os.path.isdir(utils_dir) and not os.path.exists(utils_init):
+        try:
+            with open(utils_init, "w") as f:
+                f.write("# Auto-generated __init__.py for utils package\n")
+        except OSError:
+            logger.warning("Could not create utils __init__.py")
+
+
+def run_comfyui() -> NoReturn:
+    """Run the ComfyUI main.py with persistence enabled."""
+    # Initialize persistence
+    persistent_dir = get_persistent_dir()
+    logger.info("Using persistent directory: %s", persistent_dir)
+
+    # Setup command line args
+    setup_command_line_args(persistent_dir)
+
+    # Log current arguments for debugging
+    logger.info("Command line arguments: %s", sys.argv)
+
+    # Set environment variables
+    os.environ["COMFY_USER_DIR"] = persistent_dir
+    os.environ["COMFY_SAVE_PATH"] = os.path.join(persistent_dir, "user")
+
+    # Get app directory
+    app_dir = os.path.dirname(os.path.realpath(__file__))
+    original_main = os.path.join(app_dir, "main.py")
+
+    logger.info("Executing original main.py: %s", original_main)
+
+    # Ensure app directory is in Python path
+    sys.path.insert(0, app_dir)
+
+    # Set current directory for relative imports
+    os.chdir(app_dir)
+
+    # Set environment variable for the app directory
+    os.environ["COMFY_APP_DIR"] = app_dir
+
+    # Ensure utils package exists
+    ensure_utils_package(app_dir)
+
+    # Build command, filtering out --persistent which main.py doesn't recognize
+    filtered_args = [arg for arg in sys.argv[1:] if arg != "--persistent"]
+    cmd = [sys.executable, original_main, *filtered_args]
+
+    logger.info("Running command: %s", " ".join(cmd))
+
+    # Execute and replace current process
+    os.execve(sys.executable, cmd, os.environ)
+
+
+if __name__ == "__main__":
+    run_comfyui()
