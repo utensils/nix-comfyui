@@ -487,27 +487,28 @@
 
         # Define development shell
         devShells.default = pkgs.mkShell {
-          packages = [
-            pythonEnv
-            pkgs.stdenv.cc
-            pkgs.libGL
-            pkgs.libGLU
-            # Development tools
-            pkgs.git
-            pkgs.shellcheck
-            pkgs.shfmt
-            pkgs.nixfmt-rfc-style
-            # Python linting and type checking
-            pkgs.ruff
-            pkgs.pyright
-            # Utilities
-            pkgs.jq
-            pkgs.curl
-          ]
-          ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
-            # macOS-specific tools
-            pkgs.darwin.apple_sdk.frameworks.Metal
-          ];
+          packages =
+            [
+              pythonEnv
+              pkgs.stdenv.cc
+              pkgs.libGL
+              pkgs.libGLU
+              # Development tools
+              pkgs.git
+              pkgs.shellcheck
+              pkgs.shfmt
+              pkgs.nixfmt-rfc-style
+              # Python linting and type checking
+              pkgs.ruff
+              pkgs.pyright
+              # Utilities
+              pkgs.jq
+              pkgs.curl
+            ]
+            ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
+              # macOS-specific tools
+              pkgs.darwin.apple_sdk.frameworks.Metal
+            ];
 
           shellHook = ''
             echo "ComfyUI development environment activated"
